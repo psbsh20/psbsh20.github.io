@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pagination (CDN React, no Babel)</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel" data-presets="react,env">
+      const { useEffect, useMemo, useState } = React;
+
+      function App() {
+        const [data, setData] = useState([]); // 전체 데이터
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState('');
+        const [pageSize, setPageSize] = useState(9); // 페이지 크기
+        const [page, setPage] = useState(1); // 현재 페이지 (1-indexed)
+
+        // 비동기 데이터 로드
+        useEffect(() => {
+          (async () => {
+            try {
+              setLoading(true);
+              setError('');
+              const res = await fetch('https://jsonplaceholder.typicode.com/posts');
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              const json = await res.json();
+              setData(json);
+            } catch (e) {
+              setError(e.message || String(e));
+            } finally {
+              setLoading(false);
+            }
+          })();
+        }, []);
+
+        // 페이지 크기 바꾸면 1페이지로
+        useEffect(() => {
+          setPage(1);
+        }, [pageSize]);
+
+        const totalPages = useMemo(() => Math.max(1, Math.ceil(data.length / pageSize)), [data.length, pageSize]);
+
+        const pageItems = useMemo(() => {
+          const start = (page - 1) * pageSize;
+          return data.slice(start, start + pageSize);
+        }, [data, page, pageSize]);
+
+        const go = (p) => setPage(Math.min(Math.max(1, p), totalPages));
+
+        return (
+          <div className="wrap">
+            <h1>Posts (CDN React)</h1>
+
+            <div className="toolbar">
+              <span className="status">
+                {loading
+                  ? '불러오는 중…'
+                  : error
+                    ? '오류: ' + error
+                    : `총 ${data.length}건 · ${page}/${totalPages} 페이지`}
+              </span>
+
+              <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                <option value={9}>9 / page</option>
+                <option value={12}>12 / page</option>
+                <option value={18}>18 / page</option>
+              </select>
+            </div>
+
+            {loading ? (
+              <div className="loading">Loading…</div>
+            ) : error ? (
+              <div className="loading">
+                {error} · <button onClick={() => location.reload()}>다시 시도</button>
+              </div>
+            ) : (
+              <>
+                <ul className="grid">
+                  {pageItems.map((p) => (
+                    <li key={p.id} className="card">
+                      <b className="id">{p.id}.</b>
+                      <span className="title">{capitalize(p.title)}</span>
+                      <p className="body">{p.body}</p>
+                    </li>
+                  ))}
+                </ul>
+
+                <nav className="pager" aria-label="Pagination">
+                  <button onClick={() => go(page - 1)} disabled={page <= 1}>
+                    ‹ Prev
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => go(num)}
+                      className={num === page ? 'active' : ''}
+                      aria-current={num === page ? 'page' : undefined}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                  <button onClick={() => go(page + 1)} disabled={page >= totalPages}>
+                    Next ›
+                  </button>
+                </nav>
+              </>
+            )}
+          </div>
+        );
+      }
+
+      function capitalize(s) {
+        return s ? s[0].toUpperCase() + s.slice(1) : s;
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
